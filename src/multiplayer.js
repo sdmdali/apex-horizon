@@ -1,7 +1,8 @@
 import { io } from "socket.io-client";
 
-export const socket = io("http://10.132.169.92:3001", {
-  autoConnect: false
+export const socket = io("https://apex-horizon.onrender.com", {
+  autoConnect: false,
+  transports: ["websocket", "polling"]
 });
 
 socket.on("connect", () => {
