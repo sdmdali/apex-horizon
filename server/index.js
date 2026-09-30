@@ -105,6 +105,8 @@ app.get("/", (req, res) => {
   res.send("Apex Horizon multiplayer server is running!");
 });
 
-server.listen(3001, "0.0.0.0", () => {
-  console.log("Multiplayer server running on port 3001");
+const PORT = process.env.PORT || 3001;
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Multiplayer server running on port ${PORT}`);
 });
