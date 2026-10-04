@@ -39,11 +39,13 @@ export default function App() {
 
   const [telemetry, setTelemetry] = useState<GameTelemetry | null>(null);
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
+  const [playerName, setPlayerName] = useState('Player');
   const [isMuted, setIsMuted] = useState(false);
   const [cameraModeName, setCameraModeName] = useState<'Chase' | 'Cockpit' | 'Orbit'>('Chase');
   const [showLapSplitsModal, setShowLapSplitsModal] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [roomInput, setRoomInput] = useState('');
+  const [isPortrait, setIsPortrait] = useState(false);
   const [multiplayerStatus, setMultiplayerStatus] = useState('');
   const countdownStartedRef = useRef(false);
 
@@ -52,7 +54,21 @@ export default function App() {
       engineRef.current.startRace();
     }
   };
-  
+
+  useEffect(() => {
+  const checkOrientation = () => {
+    setIsPortrait(window.innerHeight > window.innerWidth);
+  };
+
+  checkOrientation();
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', checkOrientation);
+
+  return () => {
+    window.removeEventListener('resize', checkOrientation);
+    window.removeEventListener('orientationchange', checkOrientation);
+  };
+}, []);
 
   // Connect to multiplayer server
 useEffect(() => {
@@ -68,15 +84,16 @@ useEffect(() => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const engine = new RacingEngine(canvasRef.current, (t) => {
-      setTelemetry({ ...t });
-    });
-    engineRef.current = engine;
+ const engine = new RacingEngine(canvasRef.current, (t) => {
+  setTelemetry({ ...t });
+}, playerName);
 
-    return () => {
-      engine.dispose();
-    };
-  }, []);
+engineRef.current = engine;
+
+return () => {
+  engine.dispose();
+};
+}, [playerName]);
 
   useEffect(() => {
   const handlePlayersUpdate = (count: number) => {
@@ -319,6 +336,7 @@ const handleJoinRoom = () => {
   const bestLapTime = telemetry?.bestLapTime || 0;
   const recentSplit = telemetry?.recentLapNotification || null;
   const isWinner = telemetry?.isWinner || false;
+  const winnerName = telemetry?.winnerName || 'Winner';
   const isPodium = telemetry?.isPodium || false;
 
   const formatTimer = (sec: number) => {
@@ -340,7 +358,23 @@ const handleJoinRoom = () => {
   const playerAngleDeg = (playerAngleRad * 180) / Math.PI;
 
   return (
-    <div className="game-shell relative w-screen h-screen overflow-hidden bg-[#070913] select-none text-white font-sans">
+    <div className="game-shell relative w-screen min-h-[100dvh] overflow-x-hidden overflow-y-auto bg-[#070913] select-none text-white font-sans">
+       {isPortrait && (
+      <div className="fixed inset-0 z-[9999] bg-[#050816] flex items-center justify-center text-white text-center p-6">
+        <div>
+          <div className="text-5xl mb-4">↻</div>
+
+          <h2 className="text-xl font-black">
+            ROTATE YOUR PHONE
+          </h2>
+
+          <p className="text-sm text-slate-400 mt-2">
+            Please turn your phone sideways to play Apex Horizon.
+          </p>
+        </div>
+      </div>
+    )}
+
       {/* 3D WebGL Canvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block z-0" />
 
@@ -581,82 +615,113 @@ const handleJoinRoom = () => {
         </div>
       )}
 
-      {/* MOBILE / ON-SCREEN CONTROLS (Pointer captured, zero ghost steering, responsive layout) */}
-      {(gameState === 'RACING' || gameState === 'COUNTDOWN') && (
-        <div className="game-controls absolute bottom-2 sm:bottom-4 inset-x-0 z-20 pointer-events-none flex justify-between px-2 sm:px-6">
-          {/* Steering: Left & Right */}
-          <div className="flex gap-2 sm:gap-3 pointer-events-auto">
-            <button
-              onPointerDown={(e) => handlePointerAction('left', true, e)}
-              onPointerUp={(e) => handlePointerAction('left', false, e)}
-              onPointerCancel={(e) => handlePointerAction('left', false, e)}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border transition-all duration-75 backdrop-blur-md flex items-center justify-center text-2xl font-black shadow-xl touch-none select-none ${
-                activeKeys['left']
-                  ? 'bg-cyan-400 text-slate-950 border-white scale-95 shadow-[0_0_25px_rgba(0,240,255,0.9)]'
-                  : 'bg-slate-900/90 text-cyan-300 border-cyan-500/40 active:scale-95'
-              }`}
-              title="Steer Left"
-            >
-              ◀
-            </button>
-            <button
-              onPointerDown={(e) => handlePointerAction('right', true, e)}
-              onPointerUp={(e) => handlePointerAction('right', false, e)}
-              onPointerCancel={(e) => handlePointerAction('right', false, e)}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border transition-all duration-75 backdrop-blur-md flex items-center justify-center text-2xl font-black shadow-xl touch-none select-none ${
-                activeKeys['right']
-                  ? 'bg-cyan-400 text-slate-950 border-white scale-95 shadow-[0_0_25px_rgba(0,240,255,0.9)]'
-                  : 'bg-slate-900/90 text-cyan-300 border-cyan-500/40 active:scale-95'
-              }`}
-              title="Steer Right"
-            >
-              ▶
-            </button>
-          </div>
+{/* MOBILE / ON-SCREEN CONTROLS */}
+{(gameState === 'RACING' || gameState === 'COUNTDOWN') && (
+  <div
+    className="game-controls absolute bottom-3 inset-x-0 z-20 pointer-events-none flex justify-between items-end px-3"
+  >
+    {/* LEFT + RIGHT */}
+    <div className="flex gap-3 pointer-events-auto">
 
-          {/* Action Pedals: Drift, Brake, Gas */}
-          <div className="flex gap-1.5 sm:gap-3 pointer-events-auto">
-            <button
-              onPointerDown={(e) => handlePointerAction('drift', true, e)}
-              onPointerUp={(e) => handlePointerAction('drift', false, e)}
-              onPointerCancel={(e) => handlePointerAction('drift', false, e)}
-              className={`w-12 h-14 sm:w-14 sm:h-16 rounded-xl sm:rounded-2xl border transition-all duration-75 backdrop-blur-md flex flex-col items-center justify-center text-[10px] font-black uppercase shadow-xl touch-none select-none ${
-                activeKeys['drift']
-                  ? 'bg-amber-400 text-slate-950 border-white scale-95 shadow-[0_0_25px_rgba(251,191,36,0.9)]'
-                  : 'bg-amber-600/70 text-amber-200 border-amber-400/50 active:scale-95'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 mb-0.5 text-amber-200" />
-              <span>DRIFT</span>
-            </button>
-            <button
-              onPointerDown={(e) => handlePointerAction('brake', true, e)}
-              onPointerUp={(e) => handlePointerAction('brake', false, e)}
-              onPointerCancel={(e) => handlePointerAction('brake', false, e)}
-              className={`w-12 h-14 sm:w-14 sm:h-16 rounded-xl sm:rounded-2xl border transition-all duration-75 backdrop-blur-md flex flex-col items-center justify-center text-[10px] font-black uppercase shadow-xl touch-none select-none ${
-                activeKeys['brake']
-                  ? 'bg-rose-500 text-white border-white scale-95 shadow-[0_0_25px_rgba(244,63,94,0.9)]'
-                  : 'bg-rose-700/70 text-rose-200 border-rose-400/50 active:scale-95'
-              }`}
-            >
-              <span>BRAKE</span>
-            </button>
-            <button
-              onPointerDown={(e) => handlePointerAction('gas', true, e)}
-              onPointerUp={(e) => handlePointerAction('gas', false, e)}
-              onPointerCancel={(e) => handlePointerAction('gas', false, e)}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl border transition-all duration-75 backdrop-blur-md flex flex-col items-center justify-center text-xs font-black uppercase shadow-xl touch-none select-none ${
-                activeKeys['gas']
-                  ? 'bg-emerald-400 text-slate-950 border-white scale-95 shadow-[0_0_25px_rgba(52,211,153,0.9)]'
-                  : 'bg-emerald-600/80 text-emerald-200 border-emerald-400/60 active:scale-95'
-              }`}
-            >
-              <Gauge className="w-4 h-4 sm:w-5 sm:h-5 mb-0.5" />
-              <span>GAS</span>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* LEFT */}
+      <button
+        onPointerDown={(e) => handlePointerAction('left', true, e)}
+        onPointerUp={(e) => handlePointerAction('left', false, e)}
+        onPointerCancel={(e) => handlePointerAction('left', false, e)}
+        style={{
+          width: 'clamp(68px, 9vw, 88px)',
+          height: 'clamp(68px, 9vw, 88px)',
+        }}
+        className={`rounded-2xl border backdrop-blur-md flex items-center justify-center text-3xl font-black shadow-xl touch-none select-none ${
+          activeKeys['left']
+            ? 'bg-cyan-400 text-slate-950 border-white scale-95'
+            : 'bg-slate-900/90 text-cyan-300 border-cyan-500/40'
+        }`}
+      >
+        ◀
+      </button>
+
+      {/* RIGHT */}
+      <button
+        onPointerDown={(e) => handlePointerAction('right', true, e)}
+        onPointerUp={(e) => handlePointerAction('right', false, e)}
+        onPointerCancel={(e) => handlePointerAction('right', false, e)}
+        style={{
+          width: 'clamp(68px, 9vw, 88px)',
+          height: 'clamp(68px, 9vw, 88px)',
+        }}
+        className={`rounded-2xl border backdrop-blur-md flex items-center justify-center text-3xl font-black shadow-xl touch-none select-none ${
+          activeKeys['right']
+            ? 'bg-cyan-400 text-slate-950 border-white scale-95'
+            : 'bg-slate-900/90 text-cyan-300 border-cyan-500/40'
+        }`}
+      >
+        ▶
+      </button>
+    </div>
+
+    {/* DRIFT + BRAKE + GAS */}
+    <div className="flex gap-2 pointer-events-auto">
+
+      {/* DRIFT */}
+      <button
+        onPointerDown={(e) => handlePointerAction('drift', true, e)}
+        onPointerUp={(e) => handlePointerAction('drift', false, e)}
+        onPointerCancel={(e) => handlePointerAction('drift', false, e)}
+        style={{
+          width: 'clamp(58px, 7vw, 76px)',
+          height: 'clamp(72px, 9vw, 88px)',
+        }}
+        className={`rounded-2xl border backdrop-blur-md flex flex-col items-center justify-center text-xs font-black uppercase shadow-xl touch-none select-none ${
+          activeKeys['drift']
+            ? 'bg-amber-400 text-slate-950 border-white scale-95'
+            : 'bg-amber-600/70 text-amber-200 border-amber-400/50'
+        }`}
+      >
+        <Sparkles className="w-5 h-5 mb-1" />
+        <span>DRIFT</span>
+      </button>
+
+      {/* BRAKE */}
+      <button
+        onPointerDown={(e) => handlePointerAction('brake', true, e)}
+        onPointerUp={(e) => handlePointerAction('brake', false, e)}
+        onPointerCancel={(e) => handlePointerAction('brake', false, e)}
+        style={{
+          width: 'clamp(58px, 7vw, 76px)',
+          height: 'clamp(72px, 9vw, 88px)',
+        }}
+        className={`rounded-2xl border backdrop-blur-md flex flex-col items-center justify-center text-xs font-black uppercase shadow-xl touch-none select-none ${
+          activeKeys['brake']
+            ? 'bg-rose-500 text-white border-white scale-95'
+            : 'bg-rose-700/70 text-rose-200 border-rose-400/50'
+        }`}
+      >
+        <span>BRAKE</span>
+      </button>
+
+      {/* GAS */}
+      <button
+        onPointerDown={(e) => handlePointerAction('gas', true, e)}
+        onPointerUp={(e) => handlePointerAction('gas', false, e)}
+        onPointerCancel={(e) => handlePointerAction('gas', false, e)}
+        style={{
+          width: 'clamp(68px, 9vw, 88px)',
+          height: 'clamp(68px, 9vw, 88px)',
+        }}
+        className={`rounded-2xl border backdrop-blur-md flex flex-col items-center justify-center text-sm font-black uppercase shadow-xl touch-none select-none ${
+          activeKeys['gas']
+            ? 'bg-emerald-400 text-slate-950 border-white scale-95'
+            : 'bg-emerald-600/80 text-emerald-200 border-emerald-400/60'
+        }`}
+      >
+        <Gauge className="w-6 h-6 mb-1" />
+        <span>GAS</span>
+      </button>
+
+    </div>
+  </div>
+)}
 
       {/* WORKING PAUSE MENU OVERLAY */}
       {isPaused && (
@@ -740,7 +805,7 @@ const handleJoinRoom = () => {
 
       {/* START MENU MODAL */}
       {gameState === 'MENU' && (
-        <div className="absolute inset-0 z-40 bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-transparent backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-40 bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-transparent backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto">
           <div className="max-w-md w-full bg-[#0a0f1d]/90 border border-cyan-500/30 rounded-2xl p-6 sm:p-8 shadow-[0_0_50px_rgba(0,119,255,0.25)] flex flex-col items-center text-center">
             {/* Header Badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-3">
@@ -756,6 +821,16 @@ const handleJoinRoom = () => {
             </p>
 
             {/* Customization: Car Paint Selector */}
+            <div className="mb-3">
+  <input
+    type="text"
+    value={playerName}
+    onChange={(e) => setPlayerName(e.target.value)}
+    placeholder="Enter your name"
+    maxLength={15}
+    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm text-center outline-none focus:border-cyan-400"
+  />
+</div>
             <div className="w-full mb-6 text-left">
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 block">
                 Select Hypercar Livery:
@@ -907,12 +982,12 @@ const handleJoinRoom = () => {
             </div>
 
             <h2 className="text-3xl sm:text-4xl font-black italic tracking-tighter text-white">
-              {isWinner
-                ? 'GRAND PRIX CHAMPION!'
-                : isPodium
-                ? `${getRankOrdinal(playerRank)} PLACE PODIUM!`
-                : 'RACE FINISHED'}
-            </h2>
+  {isWinner
+    ? `${winnerName} IS THE GRAND PRIX CHAMPION!`
+    : isPodium
+    ? `${getRankOrdinal(playerRank)} PLACE PODIUM!`
+    : 'RACE FINISHED'}
+</h2>
             <p className="text-xs sm:text-sm text-slate-400 mb-5">
               {isWinner
                 ? 'Sensational driving! You claimed victory on the podium!'

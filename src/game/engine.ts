@@ -53,6 +53,7 @@ export interface GameTelemetry {
   cameraMode: 'chase' | 'hood' | 'orbit';
   isPaused: boolean;
   isWinner: boolean;
+  winnerName: string;
   isPodium: boolean;
   countdownValue: string;
   leaderboard: { rank: number; name: string; isPlayer: boolean; time: string; gap: string; finished: boolean }[];
@@ -75,6 +76,7 @@ export class RacingEngine {
 
   public racers: CarAgent[] = [];
   public player!: CarAgent;
+  private playerName: string;
   private multiplayerOpponentEnabled = false;
   private multiplayerSendTimer = 0;
 
@@ -154,9 +156,14 @@ public setOpponentPosition(s: number, l: number): void {
     this.updateEffectiveKeys();
   }
 
-  constructor(canvas: HTMLCanvasElement, onTelemetryUpdate?: (t: GameTelemetry) => void) {
+  constructor(
+  canvas: HTMLCanvasElement,
+  onTelemetryUpdate?: (t: GameTelemetry) => void,
+  playerName: string = 'Player'
+) {
     this.canvas = canvas;
     this.onTelemetryUpdate = onTelemetryUpdate;
+    this.playerName = playerName;
     audio.onAutoPause = () => {
       this.pauseRace();
     };
@@ -227,14 +234,24 @@ public setOpponentPosition(s: number, l: number): void {
   }
 
   private initRacers(): void {
-    for (const r of INITIAL_RACERS) {
-      const agent = new CarAgent(r.id, r.name, r.color, r.isPlayer, r.initialS, r.initialL, this.scene);
-      this.racers.push(agent);
-      if (r.isPlayer) {
-        this.player = agent;
-      }
+  for (const r of INITIAL_RACERS) {
+    const agent = new CarAgent(
+      r.id,
+      r.isPlayer ? this.playerName : r.name,
+      r.color,
+      r.isPlayer,
+      r.initialS,
+      r.initialL,
+      this.scene
+    );
+
+    this.racers.push(agent);
+
+    if (r.isPlayer) {
+      this.player = agent;
     }
   }
+}
 
   public setPlayerColor(hex: number): void {
     if (this.player) {
@@ -1058,6 +1075,7 @@ public setOpponentPosition(s: number, l: number): void {
       cameraMode: this.cameraMode,
       isPaused: this.isPaused,
       isWinner: playerRank === 1 && this.gameState === 'FINISHED',
+      winnerName: sorted[0].name,
       isPodium: playerRank <= 3 && this.gameState === 'FINISHED',
       countdownValue: this.countdownValue,
       leaderboard,
