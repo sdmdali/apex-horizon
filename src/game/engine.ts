@@ -89,20 +89,48 @@ private sendPlayerPosition(dt: number): void {
     this.multiplayerSendTimer = 0;
 
     socket.emit('car-move', {
-      s: this.player.s,
-      l: this.player.l,
-      speed: this.player.speed,
-    });
+      name: this.player.name,
+  s: this.player.s,
+  l: this.player.l,
+  speed: this.player.speed,
+  lapsCompleted: this.player.lapsCompleted,
+  totalDistance: this.player.totalDistance,
+  finished: this.player.finished,
+  finishTime: this.player.finishTime,
+});
   }
 }
 
-public setOpponentPosition(s: number, l: number): void {
+public setOpponentPosition(
+  s: number,
+  l: number,
+  speed?: number,
+  name?: string,
+  lapsCompleted?: number,
+  totalDistance?: number,
+  finished?: boolean,
+  finishTime?: number
+): void {
   const opponent = this.racers[1];
   if (!opponent) return;
 
   this.multiplayerOpponentEnabled = true;
+
   opponent.s = s;
   opponent.l = l;
+
+  if (name !== undefined && name.trim()) {
+  opponent.name = name.trim();
+}
+
+  if (speed !== undefined) opponent.speed = speed;
+  if (lapsCompleted !== undefined) opponent.lapsCompleted = lapsCompleted;
+  if (totalDistance !== undefined) opponent.totalDistance = totalDistance;
+  if (finished !== undefined) opponent.finished = finished;
+  if (finished && !this.player.finished) {
+  this.gameState = 'FINISHED';
+}
+  if (finishTime !== undefined) opponent.finishTime = finishTime;
 }
 
   // Game States
@@ -173,6 +201,14 @@ public setOpponentPosition(s: number, l: number): void {
     this.initInputListeners();
     this.startLoop();
   }
+
+  public setPlayerName(name: string): void {
+  const trimmedName = name.trim();
+
+  if (trimmedName) {
+    this.player.name = trimmedName;
+  }
+}
 
   private initThree(): void {
     this.renderer = new THREE.WebGLRenderer({
@@ -620,14 +656,22 @@ public setOpponentPosition(s: number, l: number): void {
 
           // Finalize finish times for any AI racers still on track
           for (const r of this.racers) {
-            if (!r.finished) {
-              r.finished = true;
-              const remainingDist = Math.max(0, TOTAL_LAPS - r.totalDistance) * TRACK_LENGTH;
-              r.finishTime = this.raceClock + Math.max(0.6, remainingDist / Math.max(25, r.speed || 40));
-            }
-          }
+  if (this.multiplayerOpponentEnabled && r === this.racers[1]) {
+    continue;
+  }
+
+  if (!r.finished) {
+    r.finished = true;
+    const remainingDist =
+      Math.max(0, TOTAL_LAPS - r.totalDistance) * TRACK_LENGTH;
+    r.finishTime =
+      this.raceClock +
+      Math.max(0.6, remainingDist / Math.max(25, r.speed || 40));
+  }
+}
           audio.playVictoryFanfare();
-        } else {
+        } 
+        else {
           audio.playLapChime();
           this.currentLapClock = 0; // Reset for next lap
         }

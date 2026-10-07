@@ -93,7 +93,7 @@ engineRef.current = engine;
 return () => {
   engine.dispose();
 };
-}, [playerName]);
+}, []);
 
   useEffect(() => {
   const handlePlayersUpdate = (count: number) => {
@@ -105,12 +105,26 @@ return () => {
   };
 
   const handleOpponentMove = (data: {
-    s: number;
-    l: number;
-    speed?: number;
-  }) => {
-    engineRef.current?.setOpponentPosition(data.s, data.l);
-  };
+  name?: string;
+  s: number;
+  l: number;
+  speed?: number;
+  lapsCompleted?: number;
+  totalDistance?: number;
+  finished?: boolean;
+  finishTime?: number;
+}) => {
+  engineRef.current?.setOpponentPosition(
+  data.s,
+  data.l,
+  data.speed,
+  data.name,
+  data.lapsCompleted,
+  data.totalDistance,
+  data.finished,
+  data.finishTime
+);
+};
 
   const handleRaceCountdown = (data: { seconds: number }) => {
     if (countdownStartedRef.current) return;
@@ -825,7 +839,11 @@ const handleJoinRoom = () => {
   <input
     type="text"
     value={playerName}
-    onChange={(e) => setPlayerName(e.target.value)}
+    onChange={(e) => {
+  const name = e.target.value;
+  setPlayerName(name);
+  engineRef.current?.setPlayerName(name);
+}}
     placeholder="Enter your name"
     maxLength={15}
     className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm text-center outline-none focus:border-cyan-400"
